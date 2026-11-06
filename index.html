@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Office Stretching App - แอปพายืดเหยียดสำหรับชาวออฟฟิศ (โหมดนั่งหน้าคอมพ์)</title>
+  
+  <!-- p5.js และ ml5.js เวอร์ชันเสถียรล่าสุด -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 50%, #eff6ff 100%);
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px 14px;
+    }
+
+    .app-card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 740px;
+      border-radius: 28px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      padding: 32px 28px;
+      text-align: center;
+      transition: all 0.3s ease;
+      position: relative;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    /* แถบหัวสถานะและเครื่องมือ */
+    .top-utility-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge-stage {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.3px;
+    }
+
+    .settings-pills {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill-btn {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-btn:hover {
+      background: #e2e8f0;
+    }
+    .pill-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* กล่องสถิติประจำวัน (บันทึกลง LocalStorage อัตโนมัติ) */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 22px;
+      gap: 10px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0284c7;
+    }
+
+    .stat-lbl {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* 0. หน้าจอโหลดโมเดล AI ตอนเริ่มต้น */
+    .loading-container {
+      padding: 40px 20px;
+    }
+
+    .spinner {
+      width: 56px;
+      height: 56px;
+      border: 5px solid #e2e8f0;
+      border-top-color: #0284c7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 24px auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 1. นาฬิกานับถอยหลังทำงาน */
+    .timer-circle-wrap {
+      margin: 16px auto 22px auto;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 8px solid #0284c7;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #f0f9ff;
+      box-shadow: 0 10px 25px rgba(2, 132, 199, 0.15);
+      position: relative;
+    }
+
+    .timer-text {
+      font-size: 46px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: 2px;
+    }
+
+    .timer-desc {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0284c7;
+      margin-top: 4px;
+    }
+
+    /* กลุ่มปุ่มควบคุม */
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .btn {
+      border: none;
+      outline: none;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 22px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+    }
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-test {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px dashed #f59e0b;
+      font-size: 13px;
+      padding: 10px 16px;
+    }
+    .btn-test:hover {
+      background: #fde68a;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+      font-size: 16px;
+      padding: 14px 28px;
+    }
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    /* 2. การ์ดแนะนำท่ายืดเหยียด (ปรับใหม่ให้เหมาะกับท่านั่งหน้าจอ) */
+    .pose-guide-panel {
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+      border-radius: 20px;
+      padding: 16px 20px;
+      margin-bottom: 14px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .pose-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .pose-icon-bubble {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: #dcfce7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .pose-info h3 {
+      font-size: 17px;
+      font-weight: 800;
+      color: #15803d;
+    }
+
+    .pose-info p {
+      font-size: 13px;
+      color: #334155;
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .pose-step-badge {
+      background: #15803d;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    /* แถบเวลานับค้าง (Hold Progress) */
+    .hold-bar-container {
+      width: 100%;
+      height: 16px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 10px 0 16px 0;
+      position: relative;
+    }
+
+    .hold-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+      border-radius: 999px;
+      transition: width 0.08s linear;
+    }
+
+    .hold-status-text {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* หน้าต่างกล้อง Canvas */
+    #camera-container {
+      position: relative;
+      width: 100%;
+      max-width: 660px;
+      height: 420px;
+      margin: 0 auto 12px auto;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #0f172a;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #camera-container canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+
+    .camera-status-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      display: inline-block;
+    }
+    .status-dot.active {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    /* ข้อความแนะนำลอยบนภาพกล้อง */
+    .cam-instruction-banner {
+      position: absolute;
+      bottom: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 10;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      pointer-events: none;
+    }
+
+    /* 3. หน้าจอแจ้งเตือนหมดเวลา */
+    .alert-box {
+      animation: popIn 0.4s ease;
+      padding: 10px 0;
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.92); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .alert-icon {
+      font-size: 52px;
+      margin-bottom: 12px;
+    }
+
+    .alert-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #dc2626;
+      margin-bottom: 10px;
+    }
+
+    .alert-desc {
+      font-size: 15px;
+      color: #475569;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    /* 4. หน้าจอสรุปสถิติรอบของวัน */
+    .summary-card {
+      animation: popIn 0.4s ease;
+      padding: 10px 0;
+    }
+
+    .summary-trophy {
+      font-size: 64px;
+      margin-bottom: 12px;
+      animation: bounce 1s infinite alternate;
+    }
+
+    @keyframes bounce {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-8px); }
+    }
+
+    .summary-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #15803d;
+      margin-bottom: 8px;
+    }
+
+    .summary-desc {
+      font-size: 15px;
+      color: #475569;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .stats-highlight-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 440px;
+      margin: 0 auto 24px auto;
+    }
+
+    .highlight-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .highlight-val {
+      font-size: 32px;
+      font-weight: 900;
+      color: #10b981;
+    }
+
+    .highlight-lbl {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .auto-restart-note {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0284c7;
+      margin-bottom: 16px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-card">
+    
+    <!-- แถบเครื่องมือและตั้งค่า -->
+    <div class="top-utility-bar">
+      <div class="badge-stage" id="badge-top-status">
+        <span>🪑</span> <span>โหมดนั่งหน้าโต๊ะคอมพ์ (โฟกัสเฉพาะช่วงบน)</span>
+      </div>
+      <div class="settings-pills">
+        <button class="pill-btn active" id="btn-sound-toggle" onclick="toggleSound()">
+          <span id="sound-icon">🔊</span> เสียง: เปิด
+        </button>
+        <button class="pill-btn" onclick="requestDesktopNotification()">
+          🔔 เปิดแจ้งเตือนจอ
+        </button>
+      </div>
+    </div>
+
+    <!-- ส่วนแสดงสถิติรอบประจำวัน -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-val" id="completed-rounds-val">0</span>
+        <span class="stat-lbl">รอบยืดเหยียดวันนี้</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val" id="timer-mode-lbl">3 นาที</span>
+        <span class="stat-lbl">รอบเวลานับถอยหลัง</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val" id="status-val" style="color: #0284c7;">พร้อมทำงาน</span>
+        <span class="stat-lbl">สถานะระบบ</span>
+      </div>
+    </div>
+
+    <!-- 0. หน้าจอโหลดโมเดล AI -->
+    <div id="screen-loading" class="loading-container">
+      <div class="spinner"></div>
+      <h2>กำลังเริ่มต้นโมเดล AI...</h2>
+      <p class="subtitle" style="margin-top: 8px;">
+        กำลังโหลด BodyPose (MoveNet) ออกแบบสำหรับท่านั่งหน้าโต๊ะคอมพิวเตอร์<br>
+        (ประมวลผลภายในเครื่องของคุณ ปลอดภัย 100%)
+      </p>
+      <div style="font-size: 13px; color: #64748b;" id="loading-substatus">
+        กำลังเชื่อมต่อเอนจิน AI...
+      </div>
+    </div>
+
+    <!-- 1. หน้านับถอยหลังทำงาน 3 นาที -->
+    <div id="screen-timer" class="hidden">
+      <h1>Office Stretching</h1>
+      <p class="subtitle">พักสายตา ยืดร่างกายคลายคอ บ่า ไหล่ และข้อมือ โดยไม่ต้องลุกออกจากเก้าอี้</p>
+
+      <div class="timer-circle-wrap">
+        <div class="timer-text" id="timer-display">03:00</div>
+        <div class="timer-desc">รอบทำงานปัจจุบัน</div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-toggle" onclick="toggleTimer()">
+          <span id="btn-toggle-icon">▶</span> <span id="btn-toggle-text">เริ่มจับเวลา</span>
+        </button>
+        <button class="btn btn-secondary" onclick="resetTimer()">↺ รีเซ็ต</button>
+      </div>
+
+      <!-- ปุ่มเลือกระยะเวลาทำงาน -->
+      <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
+        <span style="font-size: 13px; color: #64748b; font-weight: 600;">เลือกระยะเวลา:</span>
+        <button class="pill-btn active" id="opt-3m" onclick="setWorkDuration(3, this)">3 นาที (ด่วน)</button>
+        <button class="pill-btn" id="opt-25m" onclick="setWorkDuration(25, this)">25 นาที (Pomodoro)</button>
+        <button class="pill-btn" id="opt-50m" onclick="setWorkDuration(50, this)">50 นาที (มาตรฐาน)</button>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn btn-test" onclick="simulateTimeOut()" title="กดเพื่อจำลองเวลาทำงานหมดทันที">
+          ⚡ ทดสอบ: ข้ามไปหน้าหมดเวลา
+        </button>
+        <button class="btn btn-secondary" onclick="proceedToStretch()" style="font-size: 13px; padding: 10px 16px;">
+          🧘 เข้าโหมดยืดเหยียด 5 ท่าทันที
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. หน้าจอแจ้งเตือนหมดเวลาทำงาน -->
+    <div id="screen-alert" class="alert-box hidden">
+      <div class="alert-icon">🔔</div>
+      <div class="alert-title">หมดเวลาทำงานแล้ว!</div>
+      <p class="alert-desc">
+        คุณนั่งทำงานต่อเนื่องมาครบกำหนดรอบแล้วครับ<br>
+        นั่งหน้าจอนี่แหละ มาขยับคลายคอ บ่า ไหล่ และข้อมือ 5 ท่าง่ายๆ กันเถอะ
+      </p>
+
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="proceedToStretch()">
+          🧘 เริ่มต้นยืดเหยียด 5 ท่าหน้าโต๊ะ
+        </button>
+      </div>
+
+      <div style="margin-top: 8px;">
+        <button class="btn btn-secondary" onclick="snoozeTimer(1)">
+          ⏱ ขอทำงานต่ออีก 1 นาที
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. หน้าจอเปิดกล้องยืดเหยียด 5 ท่า (ออกแบบสำหรับครึ่งตัวหน้าจอคอมพ์) -->
+    <div id="screen-stretch" class="hidden">
+      <!-- การ์ดแนะนำท่าปัจจุบัน พร้อมไอคอนภาพประกอบ -->
+      <div class="pose-guide-panel">
+        <div class="pose-left">
+          <div class="pose-icon-bubble" id="pose-icon">🙏</div>
+          <div class="pose-info">
+            <h3 id="pose-title">ท่าที่ 1: พนมมือกลางอก (ยืดข้อมือ)</h3>
+            <p id="pose-desc">พนมมือสองข้างเข้าหากันระดับอก ดันฝ่ามือชิดกันเพื่อคลายข้อมือจากการใช้เมาส์และคีย์บอร์ด</p>
+          </div>
+        </div>
+        <div class="pose-step-badge" id="pose-step-badge">ท่าที่ 1 / 5</div>
+      </div>
+
+      <!-- แถบนับเวลาค้างในท่า -->
+      <div class="hold-status-text">
+        <span id="hold-state-label" style="color: #64748b;">รอตรวจจับท่าทาง...</span>
+        <span id="hold-countdown-text">ค้างไว้ 4 วินาที</span>
+      </div>
+      <div class="hold-bar-container">
+        <div class="hold-bar-fill" id="hold-bar-fill"></div>
+      </div>
+
+      <!-- คอนเทนเนอร์แสดง Canvas ของ p5.js -->
+      <div id="camera-container">
+        <div class="camera-status-overlay">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="ai-model-status">กล้องและ AI กำลังทำงาน</span>
+        </div>
+        <div class="cam-instruction-banner" id="cam-instruction-banner">
+          นั่งหน้าจอสบายๆ ให้กล้องเห็นศีรษะ ไหล่ และช่วงอก
+        </div>
+      </div>
+
+      <!-- ปุ่มควบคุมในโหมดยืดเหยียด -->
+      <div class="btn-group">
+        <button class="btn btn-test" onclick="skipCurrentPose()" title="กดเพื่อข้ามท่านี้ไปท่าถัดไป">
+          ⚡ ข้ามท่านี้ (ทดสอบ)
+        </button>
+        <button class="btn btn-test" onclick="simulateAllPosesDone()" title="กดเพื่อทำครบ 5 ท่าทันทีและไปหน้าสรุปสถิติ">
+          ⚡ ทดสอบ: ทำครบ 5 ท่าทันที
+        </button>
+        <button class="btn btn-secondary" onclick="backToTimer()">← ออก</button>
+      </div>
+    </div>
+
+    <!-- 4. หน้าจอสรุปสถิติและเตรียมวนลูปรอบใหม่ -->
+    <div id="screen-summary" class="summary-card hidden">
+      <div class="summary-trophy">🏆</div>
+      <div class="summary-title">ยืดเหยียดครบ 5 ท่าสำเร็จ!</div>
+      <p class="summary-desc">
+        กล้ามเนื้อคอ บ่า ไหล่ และข้อมือได้รับการผ่อนคลายแล้ว<br>
+        นั่งทำงานต่อได้อย่างสบายตัวและสดชื่นขึ้นแน่นอน
+      </p>
+
+      <div class="stats-highlight-grid">
+        <div class="highlight-card">
+          <div class="highlight-val" id="summary-today-rounds">+1</div>
+          <div class="highlight-lbl">รอบสำเร็จวันนี้</div>
+        </div>
+        <div class="highlight-card">
+          <div class="highlight-val" style="color: #0284c7;">5 / 5</div>
+          <div class="highlight-lbl">ท่าที่ทำสำเร็จ</div>
+        </div>
+      </div>
+
+      <div class="auto-restart-note" id="auto-restart-text">
+        ⏱ กำลังจะเริ่มจับเวลารอบทำงานถัดไปใน 5 วินาที...
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="startNextWorkCycle()">
+          🚀 เริ่มทำงานรอบถัดไปทันที
+        </button>
+        <button class="btn btn-secondary" onclick="pauseAndStayOnSummary()">
+          ⏸ พักก่อน (หยุดลูปชั่วคราว)
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. ระบบตัวแปรและ State Management
+    // ==========================================
+    let workDurationMinutes = 3;
+    let DEFAULT_TIME = workDurationMinutes * 60;
+    let timeLeft = DEFAULT_TIME;
+    let timerInterval = null;
+    let isRunning = false;
+    let completedRounds = 0;
+    let currentScreen = 'loading';
+    let isSoundEnabled = true;
+
+    let autoRestartInterval = null;
+    let autoRestartSeconds = 5;
+
+    // อ้างอิง DOM Elements
+    const timerDisplay = document.getElementById('timer-display');
+    const btnToggleText = document.getElementById('btn-toggle-text');
+    const btnToggleIcon = document.getElementById('btn-toggle-icon');
+    const statusVal = document.getElementById('status-val');
+    const completedRoundsVal = document.getElementById('completed-rounds-val');
+    const timerModeLbl = document.getElementById('timer-mode-lbl');
+
+    const screenLoading = document.getElementById('screen-loading');
+    const screenTimer = document.getElementById('screen-timer');
+    const screenAlert = document.getElementById('screen-alert');
+    const screenStretch = document.getElementById('screen-stretch');
+    const screenSummary = document.getElementById('screen-summary');
+
+    const statusDot = document.getElementById('status-dot');
+    const aiModelStatus = document.getElementById('ai-model-status');
+    const camInstructionBanner = document.getElementById('cam-instruction-banner');
+    const loadingSubstatus = document.getElementById('loading-substatus');
+
+    const poseIcon = document.getElementById('pose-icon');
+    const poseTitle = document.getElementById('pose-title');
+    const poseDesc = document.getElementById('pose-desc');
+    const poseStepBadge = document.getElementById('pose-step-badge');
+    const holdStateLabel = document.getElementById('hold-state-label');
+    const holdCountdownText = document.getElementById('hold-countdown-text');
+    const holdBarFill = document.getElementById('hold-bar-fill');
+
+    const summaryTodayRounds = document.getElementById('summary-today-rounds');
+    const autoRestartText = document.getElementById('auto-restart-text');
+    const soundIcon = document.getElementById('sound-icon');
+    const btnSoundToggle = document.getElementById('btn-sound-toggle');
+
+    initDailyStats();
+
+    function initDailyStats() {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const savedData = JSON.parse(localStorage.getItem('office_stretch_stats') || '{}');
+        if (savedData.date === todayStr) {
+          completedRounds = savedData.rounds || 0;
+        } else {
+          completedRounds = 0;
+          saveDailyStats();
+        }
+        completedRoundsVal.textContent = completedRounds;
+      } catch (e) {
+        completedRounds = 0;
+      }
+    }
+
+    function saveDailyStats() {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('office_stretch_stats', JSON.stringify({
+          date: todayStr,
+          rounds: completedRounds
+        }));
+      } catch (e) {}
+    }
+
+    // ==========================================
+    // 2. ข้อมูล 5 ท่ายืดเหยียดที่เหมาะกับคนนั่งหน้าคอมพ์ (เห็นแค่ครึ่งตัว)
+    // จุดเด่น: ไม่ต้องชูมือหลุดขอบบน, ไม่ต้องกางแขนหลุดขอบข้าง, นั่งเก้าอี้ทำได้ทันที
+    // ==========================================
+    const STRETCH_POSES = [
+      {
+        id: 1,
+        icon: "🙏",
+        name: "ท่าที่ 1: พนมมือกลางอก (ยืดคลายข้อมือ)",
+        desc: "พนมมือสองข้างเข้าหากันระดับอก ดันฝ่ามือชิดกันเพื่อคลายกล้ามเนื้อข้อมือจากการพิมพ์งานและใช้เมาส์",
+        instruction: "พนมมือสองข้างเข้าหากันที่ระดับอก ดันฝ่ามือชิดกัน",
+        check: (pose) => {
+          // ตรวจสอบ: ข้อมือสองข้างอยู่ชิดกัน อยู่บริเวณกึ่งกลางอกใต้ระดับไหล่
+          const nose = pose.keypoints[0];
+          const lShoulder = pose.keypoints[5];
+          const rShoulder = pose.keypoints[6];
+          const lWrist = pose.keypoints[9];
+          const rWrist = pose.keypoints[10];
+
+          if (!isConfident(lShoulder) || !isConfident(rShoulder) || !isConfident(lWrist) || !isConfident(rWrist)) return false;
+
+          const shoulderWidth = Math.hypot(lShoulder.x - rShoulder.x, lShoulder.y - rShoulder.y);
+          const shoulderAvgX = (lShoulder.x + rShoulder.x) / 2;
+          const wristDist = Math.hypot(lWrist.x - rWrist.x, lWrist.y - rWrist.y);
+          const wristAvgX = (lWrist.x + rWrist.x) / 2;
+          const wristAvgY = (lWrist.y + rWrist.y) / 2;
+
+          return (wristDist < shoulderWidth * 0.48) &&
+                 (Math.abs(wristAvgX - shoulderAvgX) < shoulderWidth * 0.42) &&
+                 (wristAvgY > (nose ? nose.y + 15 : 100));
+        }
+      },
+      {
+        id: 2,
+        icon: "🙇‍♂️",
+        name: "ท่าที่ 2: มือแตะหัวไหล่สองข้าง (คลายกล้ามเนื้อบ่า)",
+        desc: "นำมือซ้ายแตะไหล่ซ้าย มือขวาแตะไหล่ขวา กางข้อศอกออกเพื่อคลายกล้ามเนื้อสะบักและบ่า",
+        instruction: "ยกมือทั้งสองข้างขึ้นมาแตะที่หัวไหล่ของตัวเอง",
+        check: (pose) => {
+          // ตรวจสอบ: มือซ้ายแตะใกล้ไหล่ซ้าย และมือขวาแตะใกล้ไหล่ขวา (อยู่ในกรอบภาพแน่นอน)
+          const lShoulder = pose.keypoints[5];
+          const rShoulder = pose.keypoints[6];
+          const lWrist = pose.keypoints[9];
+          const rWrist = pose.keypoints[10];
+
+          if (!isConfident(lShoulder) || !isConfident(rShoulder) || !isConfident(lWrist) || !isConfident(rWrist)) return false;
+
+          const shoulderWidth = Math.hypot(lShoulder.x - rShoulder.x, lShoulder.y - rShoulder.y);
+          const lDist = Math.hypot(lWrist.x - lShoulder.x, lWrist.y - lShoulder.y);
+          const rDist = Math.hypot(rWrist.x - rShoulder.x, rWrist.y - rShoulder.y);
+
+          return (lDist < shoulderWidth * 0.62) && (rDist < shoulderWidth * 0.62);
+        }
+      },
+      {
+        id: 3,
+        icon: "🙆‍♂️",
+        name: "ท่าที่ 3: สองมือแตะท้ายทอย (เปิดอกแก้หลังค่อม)",
+        desc: "นำมือสองข้างแตะที่ท้ายทอยหรือหลังศีรษะ กางข้อศอกออกเพื่อเปิดแผงอกจากการนั่งหลังค่อม",
+        instruction: "นำมือสองข้างมาแตะบริเวณหลังศีรษะหรือท้ายทอย",
+        check: (pose) => {
+          // ตรวจสอบ: ข้อมือสองข้างยกอยู่ระดับศีรษะและอยู่ในแนวกึ่งกลาง (ไม่หลุดขอบบนกล้อง)
+          const nose = pose.keypoints[0];
+          const lShoulder = pose.keypoints[5];
+          const rShoulder = pose.keypoints[6];
+          const lWrist = pose.keypoints[9];
+          const rWrist = pose.keypoints[10];
+
+          if (!isConfident(lShoulder) || !isConfident(rShoulder) || !isConfident(lWrist) || !isConfident(rWrist) || !isConfident(nose)) return false;
+
+          const shoulderWidth = Math.hypot(lShoulder.x - rShoulder.x, lShoulder.y - rShoulder.y);
+          const wristsAboveShoulder = (lWrist.y < lShoulder.y) && (rWrist.y < rShoulder.y);
+          const wristsNearHeadX = (Math.abs(lWrist.x - nose.x) < shoulderWidth * 0.85) &&
+                                 (Math.abs(rWrist.x - nose.x) < shoulderWidth * 0.85);
+
+          return wristsAboveShoulder && wristsNearHeadX;
+        }
+      },
+      {
+        id: 4,
+        icon: "👤",
+        name: "ท่าที่ 4: เอียงคอไปทางซ้าย (ยืดกล้ามเนื้อคอ-บ่าด้านขวา)",
+        desc: "นั่งตัวตรง ค่อยๆ เอียงศีรษะไปทางซ้าย ให้หูซ้ายเข้าหาไหล่ซ้าย รู้สึกตึงสบายที่กล้ามเนื้อคอด้านขวา",
+        instruction: "เอียงศีรษะไปทางซ้ายเบาๆ ค้างไว้",
+        check: (pose) => {
+          // ตรวจสอบ: ระยะห่างระหว่างหู/ตาซ้ายกับไหล่ซ้าย ชิดเข้าหากันมากกว่าด้านขวาอย่างชัดเจน
+          const lEye = pose.keypoints[1];
+          const rEye = pose.keypoints[2];
+          const lShoulder = pose.keypoints[5];
+          const rShoulder = pose.keypoints[6];
+
+          if (!isConfident(lEye) || !isConfident(rEye) || !isConfident(lShoulder) || !isConfident(rShoulder)) return false;
+
+          const distLeft = Math.hypot(lEye.x - lShoulder.x, lEye.y - lShoulder.y);
+          const distRight = Math.hypot(rEye.x - rShoulder.x, rEye.y - rShoulder.y);
+          const eyeTilt = Math.abs(lEye.y - rEye.y);
+
+          // เอียงซ้าย: ระยะซ้ายหดตัวลงอย่างน้อย 20% เมื่อเทียบกับด้านขวา หรือตาเอียงลงฝั่งซ้าย
+          return (distLeft < distRight * 0.78) && (eyeTilt > 8);
+        }
+      },
+      {
+        id: 5,
+        icon: "👤",
+        name: "ท่าที่ 5: เอียงคอไปทางขวา (ยืดกล้ามเนื้อคอ-บ่าด้านซ้าย)",
+        desc: "นั่งตัวตรง ค่อยๆ เอียงศีรษะไปทางขวา ให้หูขวาเข้าหาไหล่ขวา รู้สึกตึงสบายที่กล้ามเนื้อคอด้านซ้าย",
+        instruction: "เอียงศีรษะไปทางขวาเบาๆ ค้างไว้",
+        check: (pose) => {
+          // ตรวจสอบ: ระยะห่างระหว่างหู/ตาขวากับไหล่ขวา ชิดเข้าหากันมากกว่าด้านซ้ายอย่างชัดเจน
+          const lEye = pose.keypoints[1];
+          const rEye = pose.keypoints[2];
+          const lShoulder = pose.keypoints[5];
+          const rShoulder = pose.keypoints[6];
+
+          if (!isConfident(lEye) || !isConfident(rEye) || !isConfident(lShoulder) || !isConfident(rShoulder)) return false;
+
+          const distLeft = Math.hypot(lEye.x - lShoulder.x, lEye.y - lShoulder.y);
+          const distRight = Math.hypot(rEye.x - rShoulder.x, rEye.y - rShoulder.y);
+          const eyeTilt = Math.abs(lEye.y - rEye.y);
+
+          // เอียงขวา: ระยะขวาหดตัวลงอย่างน้อย 20% เมื่อเทียบกับด้านซ้าย หรือตาเอียงลงฝั่งขวา
+          return (distRight < distLeft * 0.78) && (eyeTilt > 8);
+        }
+      }
+    ];
+
+    function isConfident(kp) {
+      return kp && ((kp.confidence ?? kp.score ?? 0) > 0.25);
+    }
+
+    let currentPoseIndex = 0;
+    const HOLD_TARGET_SECONDS = 4.0;
+    let holdTimerSeconds = 0;
+
+    // ==========================================
+    // 3. ฟังก์ชันวงจรชีวิต p5.js & ml5.js
+    // ==========================================
+    let videoCapture;
+    let bodyPose;
+    let poses = [];
+    let isModelReady = false;
+
+    function preload() {
+      loadingSubstatus.textContent = "กำลังโหลดน้ำหนักโมเดล MoveNet โหมดนั่งทำงาน...";
+      bodyPose = ml5.bodyPose("MoveNet", { flipped: true }, () => {
+        isModelReady = true;
+        loadingSubstatus.textContent = "โมเดล AI โหลดเสร็จสิ้น!";
+        updateAIStatus("โมเดล AI พร้อมใช้งานแล้ว", "active");
+
+        setTimeout(() => {
+          showScreen('timer');
+          startTimer();
+        }, 600);
+      });
+    }
+
+    function setup() {
+      const canvas = createCanvas(640, 480);
+      canvas.parent('camera-container');
+
+      videoCapture = createCapture(VIDEO, { flipped: true });
+      videoCapture.size(640, 480);
+      videoCapture.hide();
+
+      bodyPose.detectStart(videoCapture, (results) => {
+        poses = results;
+      });
+    }
+
+    function draw() {
+      if (currentScreen !== 'stretch') {
+        background(15, 23, 42);
+        return;
+      }
+
+      if (videoCapture) {
+        image(videoCapture, 0, 0, width, height);
+      }
+
+      if (poses.length > 0) {
+        const pose = poses[0];
+        const isMatched = checkCurrentPoseMatch(pose);
+        
+        drawUpperBodySkeleton(pose, isMatched);
+        drawUpperBodyKeypoints(pose, isMatched);
+        handlePoseEvaluation(pose, isMatched);
+      } else {
+        onPoseLost();
+      }
+    }
+
+    function checkCurrentPoseMatch(pose) {
+      if (currentPoseIndex >= STRETCH_POSES.length) return false;
+      return STRETCH_POSES[currentPoseIndex].check(pose);
+    }
+
+    function handlePoseEvaluation(pose, isMatched) {
+      if (currentPoseIndex >= STRETCH_POSES.length) return;
+
+      if (isMatched) {
+        const dt = (typeof deltaTime !== 'undefined' ? deltaTime : 33.3) / 1000;
+        holdTimerSeconds += dt;
+
+        const remain = Math.max(0, HOLD_TARGET_SECONDS - holdTimerSeconds);
+        const percent = Math.min(100, (holdTimerSeconds / HOLD_TARGET_SECONDS) * 100);
+
+        holdBarFill.style.width = percent + "%";
+        holdStateLabel.innerHTML = "✨ <strong>ยอดเยี่ยม! ทำท่าถูกต้องแล้ว</strong>";
+        holdStateLabel.style.color = "#15803d";
+        holdCountdownText.textContent = `ค้างไว้อีก ${remain.toFixed(1)} วินาที`;
+        camInstructionBanner.textContent = "ค้างท่านี้ไว้ รู้สึกผ่อนคลายกล้ามเนื้อ...";
+        camInstructionBanner.style.borderColor = "#10b981";
+
+        if (holdTimerSeconds >= HOLD_TARGET_SECONDS) {
+          onPoseComplete();
+        }
+      } else {
+        if (holdTimerSeconds > 0) {
+          holdTimerSeconds = Math.max(0, holdTimerSeconds - 0.04);
+          const percent = (holdTimerSeconds / HOLD_TARGET_SECONDS) * 100;
+          holdBarFill.style.width = percent + "%";
+        }
+        holdStateLabel.innerHTML = "⌛ จัดท่าทางให้ตรงตามคำแนะนำ";
+        holdStateLabel.style.color = "#d97706";
+        holdCountdownText.textContent = `เป้าหมาย: ค้างไว้ 4 วินาที`;
+        camInstructionBanner.textContent = STRETCH_POSES[currentPoseIndex].instruction;
+        camInstructionBanner.style.borderColor = "rgba(255, 255, 255, 0.15)";
+      }
+    }
+
+    function onPoseLost() {
+      holdStateLabel.innerHTML = "👤 ยังไม่พบร่างกาย... กรุณานั่งตรงหน้ากล้อง";
+      holdStateLabel.style.color = "#64748b";
+      camInstructionBanner.textContent = "นั่งหน้าจอสบายๆ ให้เห็นช่วงศีรษะและไหล่";
+    }
+
+    function onPoseComplete() {
+      playSuccessChime();
+      speakText("ผ่านแล้วครับ");
+      holdTimerSeconds = 0;
+      holdBarFill.style.width = "0%";
+      currentPoseIndex++;
+
+      if (currentPoseIndex < STRETCH_POSES.length) {
+        updatePoseUI();
+      } else {
+        onAllPosesFinished();
+      }
+    }
+
+    function updatePoseUI() {
+      const p = STRETCH_POSES[currentPoseIndex];
+      poseIcon.textContent = p.icon;
+      poseTitle.textContent = p.name;
+      poseDesc.textContent = p.desc;
+      poseStepBadge.textContent = `ท่าที่ ${currentPoseIndex + 1} / 5`;
+      holdStateLabel.innerHTML = "รอตรวจจับท่าทาง...";
+      holdStateLabel.style.color = "#64748b";
+      holdCountdownText.textContent = "ค้างไว้ 4 วินาที";
+      holdBarFill.style.width = "0%";
+      camInstructionBanner.textContent = p.instruction;
+      speakText(p.name);
+    }
+
+    function skipCurrentPose() {
+      onPoseComplete();
+    }
+
+    function simulateAllPosesDone() {
+      currentPoseIndex = STRETCH_POSES.length;
+      onAllPosesFinished();
+    }
+
+    // ==========================================
+    // 4. สรุปสถิติรอบ และลูปกลับไปเริ่มใหม่
+    // ==========================================
+    function onAllPosesFinished() {
+      playVictorySound();
+      speakText("ยอดเยี่ยมมากครับ ยืดเหยียดครบทั้ง 5 ท่าแล้ว");
+
+      completedRounds++;
+      completedRoundsVal.textContent = completedRounds;
+      summaryTodayRounds.textContent = `${completedRounds} รอบ`;
+      saveDailyStats();
+
+      statusVal.textContent = "ยืดเหยียดสำเร็จ!";
+      statusVal.style.color = "#10b981";
+
+      showScreen('summary');
+
+      autoRestartSeconds = 5;
+      autoRestartText.textContent = `⏱ กำลังจะเริ่มจับเวลารอบทำงานถัดไปใน ${autoRestartSeconds} วินาที...`;
+
+      clearInterval(autoRestartInterval);
+      autoRestartInterval = setInterval(() => {
+        autoRestartSeconds--;
+        if (autoRestartSeconds > 0) {
+          autoRestartText.textContent = `⏱ กำลังจะเริ่มจับเวลารอบทำงานถัดไปใน ${autoRestartSeconds} วินาที...`;
+        } else {
+          clearInterval(autoRestartInterval);
+          startNextWorkCycle();
+        }
+      }, 1000);
+    }
+
+    function startNextWorkCycle() {
+      clearInterval(autoRestartInterval);
+      timeLeft = DEFAULT_TIME;
+      updateDisplay();
+      showScreen('timer');
+      startTimer();
+      playCycleStartChime();
+    }
+
+    function pauseAndStayOnSummary() {
+      clearInterval(autoRestartInterval);
+      autoRestartText.innerHTML = "⏸ หยุดการวนลูปชั่วคราว (เมื่อพร้อมแล้วกดปุ่มด้านล่างเพื่อเริ่มรอบถัดไป)";
+      autoRestartText.style.color = "#f59e0b";
+    }
+
+    // ==========================================
+    // 5. วาด Skeleton และ Keypoints
+    // ==========================================
+    function drawUpperBodySkeleton(pose, isMatched) {
+      if (isMatched) {
+        stroke(16, 185, 129, 240); // เส้นเรืองแสงสีเขียวเมื่อท่าถูกต้อง
+        strokeWeight(6);
+      } else {
+        stroke(56, 189, 248, 200); // สีฟ้าปกติ
+        strokeWeight(4);
+      }
+
+      connectJoints(pose, 5, 6);
+      connectJoints(pose, 5, 7);
+      connectJoints(pose, 7, 9);
+      connectJoints(pose, 6, 8);
+      connectJoints(pose, 8, 10);
+    }
+
+    function connectJoints(pose, idxA, idxB) {
+      const kpA = pose.keypoints[idxA];
+      const kpB = pose.keypoints[idxB];
+      if (isConfident(kpA) && isConfident(kpB)) {
+        line(kpA.x, kpA.y, kpB.x, kpB.y);
+      }
+    }
+
+    function drawUpperBodyKeypoints(pose, isMatched) {
+      for (let i = 0; i <= 10 && i < pose.keypoints.length; i++) {
+        const kp = pose.keypoints[i];
+        if (isConfident(kp)) {
+          if (isMatched) {
+            fill(16, 185, 129, 140);
+            noStroke();
+            circle(kp.x, kp.y, 18);
+
+            fill(255, 255, 255);
+            stroke(16, 185, 129);
+            strokeWeight(4);
+            circle(kp.x, kp.y, 11);
+          } else {
+            fill(14, 165, 233, 120);
+            noStroke();
+            circle(kp.x, kp.y, 16);
+
+            fill(255, 255, 255);
+            stroke(14, 165, 233);
+            strokeWeight(3);
+            circle(kp.x, kp.y, 10);
+          }
+        }
+      }
+    }
+
+    function updateAIStatus(text, state) {
+      aiModelStatus.textContent = text;
+      statusDot.className = "status-dot " + (state || "");
+    }
+
+    // ==========================================
+    // 6. สัญญาณเสียง & เสียงบรรยาย
+    // ==========================================
+    function toggleSound() {
+      isSoundEnabled = !isSoundEnabled;
+      if (isSoundEnabled) {
+        soundIcon.textContent = "🔊";
+        btnSoundToggle.innerHTML = "<span>🔊</span> เสียง: เปิด";
+        btnSoundToggle.classList.add('active');
+      } else {
+        soundIcon.textContent = "🔇";
+        btnSoundToggle.innerHTML = "<span>🔇</span> เสียง: ปิด";
+        btnSoundToggle.classList.remove('active');
+      }
+    }
+
+    function playTone(ctx, freq, startTime, duration) {
+      if (!isSoundEnabled) return;
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime + startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + startTime);
+        osc.stop(ctx.currentTime + startTime + duration);
+      } catch (e) {}
+    }
+
+    function playSuccessChime() {
+      if (!isSoundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        playTone(ctx, 523.25, 0, 0.15); // C5
+        playTone(ctx, 659.25, 0.12, 0.25); // E5
+      } catch (e) {}
+    }
+
+    function playVictorySound() {
+      if (!isSoundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        playTone(ctx, 523.25, 0, 0.2); // C5
+        playTone(ctx, 659.25, 0.15, 0.2); // E5
+        playTone(ctx, 783.99, 0.3, 0.2); // G5
+        playTone(ctx, 1046.50, 0.45, 0.5); // C6
+      } catch (e) {}
+    }
+
+    function playCycleStartChime() {
+      if (!isSoundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        playTone(ctx, 440, 0, 0.15); // A4
+        playTone(ctx, 554.37, 0.12, 0.25); // C#5
+      } catch (e) {}
+    }
+
+    function playBeepAlert() {
+      if (!isSoundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        playTone(ctx, 587.33, 0, 0.3);
+        playTone(ctx, 880, 0.15, 0.4);
+      } catch (e) {}
+    }
+
+    function speakText(text) {
+      if (!isSoundEnabled || !window.speechSynthesis) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'th-TH';
+        utter.rate = 1.05;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {}
+    }
+
+    function requestDesktopNotification() {
+      if (!("Notification" in window)) {
+        alert("เบราว์เซอร์นี้ไม่รองรับ Desktop Notification");
+        return;
+      }
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification("Office Stretching", {
+            body: "ระบบเปิดแจ้งเตือนสำเร็จแล้ว! เราจะเตือนคุณเมื่อถึงเวลายืดเหยียด",
+            icon: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9d8.png"
+          });
+        }
+      });
+    }
+
+    function triggerDesktopNotification() {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("หมดเวลาทำงานแล้ว!", {
+          body: "ได้เวลาพักยืดคลายคอ บ่า ไหล่ และข้อมือ 5 ท่าหน้าจอคอมพ์ครับ 🧘",
+          icon: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9d8.png"
+        });
+      }
+    }
+
+    // ==========================================
+    // 7. ระบบนาฬิกาและการสลับหน้าจอ UI
+    // ==========================================
+    function setWorkDuration(minutes, btn) {
+      workDurationMinutes = minutes;
+      DEFAULT_TIME = minutes * 60;
+      timeLeft = DEFAULT_TIME;
+      updateDisplay();
+      timerModeLbl.textContent = `${minutes} นาที`;
+
+      document.querySelectorAll('.settings-pills button, .pill-btn').forEach(b => {
+        if (b.id && b.id.startsWith('opt-')) b.classList.remove('active');
+      });
+      if (btn) btn.classList.add('active');
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateDisplay() {
+      timerDisplay.textContent = formatTime(timeLeft);
+    }
+
+    function toggleTimer() {
+      if (isRunning) pauseTimer();
+      else startTimer();
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      btnToggleText.textContent = "พักเวลา";
+      btnToggleIcon.textContent = "⏸";
+      statusVal.textContent = "กำลังทำงาน";
+      statusVal.style.color = "#0284c7";
+
+      timerInterval = setInterval(() => {
+        if (timeLeft > 0) {
+          timeLeft--;
+          updateDisplay();
+        } else {
+          onTimeUp();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      btnToggleText.textContent = "จับเวลาต่อ";
+      btnToggleIcon.textContent = "▶";
+      statusVal.textContent = "หยุดชั่วคราว";
+      statusVal.style.color = "#f59e0b";
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      timeLeft = DEFAULT_TIME;
+      updateDisplay();
+      btnToggleText.textContent = "เริ่มจับเวลา";
+      btnToggleIcon.textContent = "▶";
+      statusVal.textContent = "พร้อมทำงาน";
+      statusVal.style.color = "#0284c7";
+    }
+
+    function onTimeUp() {
+      pauseTimer();
+      playBeepAlert();
+      triggerDesktopNotification();
+      showScreen('alert');
+      statusVal.textContent = "หมดเวลาทำงาน!";
+      statusVal.style.color = "#dc2626";
+      speakText("หมดเวลาทำงานแล้ว ได้เวลายืดเหยียดครับ");
+    }
+
+    function simulateTimeOut() {
+      timeLeft = 0;
+      updateDisplay();
+      onTimeUp();
+    }
+
+    function snoozeTimer(minutes) {
+      timeLeft = minutes * 60;
+      updateDisplay();
+      showScreen('timer');
+      startTimer();
+    }
+
+    function proceedToStretch() {
+      currentPoseIndex = 0;
+      holdTimerSeconds = 0;
+      updatePoseUI();
+      showScreen('stretch');
+      statusVal.textContent = "โหมดยืดเหยียด 5 ท่า";
+      statusVal.style.color = "#10b981";
+    }
+
+    function backToTimer() {
+      resetTimer();
+      showScreen('timer');
+    }
+
+    function showScreen(screenName) {
+      currentScreen = screenName;
+      screenLoading.classList.add('hidden');
+      screenTimer.classList.add('hidden');
+      screenAlert.classList.add('hidden');
+      screenStretch.classList.add('hidden');
+      screenSummary.classList.add('hidden');
+
+      if (screenName === 'loading') {
+        screenLoading.classList.remove('hidden');
+      } else if (screenName === 'timer') {
+        screenTimer.classList.remove('hidden');
+      } else if (screenName === 'alert') {
+        screenAlert.classList.remove('hidden');
+      } else if (screenName === 'stretch') {
+        screenStretch.classList.remove('hidden');
+      } else if (screenName === 'summary') {
+        screenSummary.classList.remove('hidden');
+      }
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
